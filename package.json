@@ -1,14 +1,18 @@
 {
   "name": "koishi-plugin-adapter-tanebi",
   "description": "将 tanebi 集成到 Koishi!",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
     "dist"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanebijs/koishi-plugin-adapter-tanebi.git"
+  },
   "scripts": {},
   "keywords": [
     "chatbot",
