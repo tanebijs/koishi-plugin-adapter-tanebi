@@ -1,5 +1,5 @@
 {
-  "name": "koishi-plugin-adapter-tanebi",
+  "name": "@tanebijs/koishi-plugin-adapter-tanebi",
   "description": "将 tanebi 集成到 Koishi!",
   "version": "0.1.0",
   "main": "lib/index.js",
