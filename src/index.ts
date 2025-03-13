@@ -1,11 +1,11 @@
-import { Context, Schema } from 'koishi'
+import { Context, Schema } from 'koishi';
 
-export const name = 'adapter-tanebi'
+export const name = 'adapter-tanebi';
 
 export interface Config {}
 
-export const Config: Schema<Config> = Schema.object({})
+export const Config: Schema<Config> = Schema.object({});
 
 export function apply(ctx: Context) {
-  // write your plugin here
+    // write your plugin here
 }
