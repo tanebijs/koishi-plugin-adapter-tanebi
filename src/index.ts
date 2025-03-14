@@ -90,7 +90,6 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 namespace TanebiBot {
     export const inject = ['database', 'logger'];
 

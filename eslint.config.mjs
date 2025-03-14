@@ -10,6 +10,11 @@ export default [
     ...tseslint.configs.recommended,
     {
         rules: {
+            '@typescript-eslint/no-namespace': ['off'],
+        }
+    },
+    {
+        rules: {
             'semi': ['error', 'always'],
             'quotes': ['error', 'single'],
             'indent': ['error', 4],
