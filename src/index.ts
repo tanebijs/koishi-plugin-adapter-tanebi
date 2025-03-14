@@ -86,8 +86,7 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
     }
 
     override async dispose(): Promise<void> {
-        this.internal[ctx].ssoLogic.socket.destroy(); // TODO: add offline logic
-        this.logger.info('User logout');
+        await this.internal.dispose();
     }
 }
 
