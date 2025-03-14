@@ -1,5 +1,7 @@
 import { Schema, Bot as KoishiBot, Context } from 'koishi';
 import { fetchAppInfoFromSignUrl, UrlSignProvider, DeviceInfo, newDeviceInfo, deserializeDeviceInfo, Keystore, newKeystore, deserializeKeystore, serializeDeviceInfo, ctx, serializeKeystore, Bot } from 'tanebi';
+import { resolve } from 'node:path';
+import { QrCodeProvider } from './qrcode';
 
 declare module 'koishi' {
     interface Tables {
@@ -16,11 +18,21 @@ declare module 'koishi' {
 
 class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
     internal: Bot;
+    qrCode?: Buffer;
 
     constructor(ctx: Context, config: TanebiBot.Config) {
         super(ctx, config);
         this.platform = 'tanebi';
         this.logger = ctx.logger('tanebi');
+
+        this.ctx.inject(['console'], (ctx) => {
+            ctx.console.addEntry({
+                dev: resolve(__dirname, '../client/index.ts'),
+                prod: resolve(__dirname, '../dist'),
+            });
+        });
+
+        this.ctx.plugin(QrCodeProvider, () => this.qrCode);
 
         this.ctx.model.extend('tanebi.deviceInfo', {
             uin: 'integer',
@@ -68,10 +80,15 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         this.internal.onWarning((module, message) => this.logger.warn(`[${module}] ${message}`));
 
         if (firstUse) {
-            await this.internal.qrCodeLogin((url) => {
-                this.logger.info('请使用手机 QQ 扫描以下二维码登录');
+            await this.internal.qrCodeLogin((url, png) => {
+                this.logger.info('Please scan the QR code on the screen with Mobile QQ.');
+                this.logger.info('Or you can manually generate a QR code with the following URL:');
                 this.logger.info(url);
+                this.qrCode = png;
+                this.ctx.console.refresh('tanebi.qrcode');
             });
+            delete this.qrCode;
+            this.ctx.console.refresh('tanebi.qrcode');
             await this.ctx.database.create('tanebi.deviceInfo', {
                 uin: this.config.uin,
                 payload: JSON.stringify(serializeDeviceInfo(this.internal[ctx].deviceInfo)),
@@ -91,7 +108,7 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
 }
 
 namespace TanebiBot {
-    export const inject = ['database', 'logger'];
+    export const inject = ['database', 'logger', 'console'];
 
     export interface Config {
         uin: number;
