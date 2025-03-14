@@ -3,11 +3,11 @@ import { fetchAppInfoFromSignUrl, UrlSignProvider, DeviceInfo, newDeviceInfo, de
 
 declare module 'koishi' {
     interface Tables {
-        deviceInfo: {
+        'tanebi.deviceInfo': {
             uin: number;
             payload: string;
         };
-        keystore: {
+        'tanebi.keystore': {
             uin: number;
             payload: string;
         };
@@ -22,14 +22,14 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         this.platform = 'tanebi';
         this.logger = ctx.logger('tanebi');
 
-        this.ctx.model.extend('deviceInfo', {
+        this.ctx.model.extend('tanebi.deviceInfo', {
             uin: 'integer',
             payload: 'string',
         }, {
             primary: 'uin',
         });
 
-        this.ctx.model.extend('keystore', {
+        this.ctx.model.extend('tanebi.keystore', {
             uin: 'integer',
             payload: 'string',
         }, {
@@ -44,7 +44,7 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         const signProvider = UrlSignProvider(this.config.signApiUrl);
 
         let deviceInfo: DeviceInfo;
-        const deviceInfoQuery = await this.ctx.database.get('deviceInfo', { uin: this.config.uin });
+        const deviceInfoQuery = await this.ctx.database.get('tanebi.deviceInfo', { uin: this.config.uin });
         if (deviceInfoQuery.length === 0) {
             firstUse = true;
             deviceInfo = newDeviceInfo();
@@ -53,7 +53,7 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         }
 
         let keystore: Keystore;
-        const keystoreQuery = await this.ctx.database.get('keystore', { uin: this.config.uin });
+        const keystoreQuery = await this.ctx.database.get('tanebi.keystore', { uin: this.config.uin });
         if (keystoreQuery.length === 0) {
             firstUse = true;
             keystore = newKeystore();
@@ -72,11 +72,11 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
                 this.logger.info('请使用手机 QQ 扫描以下二维码登录');
                 this.logger.info(url);
             });
-            await this.ctx.database.create('deviceInfo', {
+            await this.ctx.database.create('tanebi.deviceInfo', {
                 uin: this.config.uin,
                 payload: JSON.stringify(serializeDeviceInfo(this.internal[ctx].deviceInfo)),
             });
-            await this.ctx.database.create('keystore', {
+            await this.ctx.database.create('tanebi.keystore', {
                 uin: this.config.uin,
                 payload: JSON.stringify(serializeKeystore(this.internal[ctx].keystore)),
             });
@@ -98,7 +98,7 @@ namespace TanebiBot {
         uin: number;
         signApiUrl: string;
     }
-    
+
     export const Config: Schema<Config> = Schema.object({
         uin: Schema.number()
             .description('机器人 QQ 号')
@@ -106,7 +106,7 @@ namespace TanebiBot {
         signApiUrl: Schema.string()
             .description('签名 API URL')
             .default('https://sign.lagrangecore.org/api/sign/30366'),
-    });   
+    });
 }
 
 export default TanebiBot;
