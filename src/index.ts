@@ -2,6 +2,8 @@ import { Schema, Bot as KoishiBot, Context } from 'koishi';
 import { fetchAppInfoFromSignUrl, UrlSignProvider, DeviceInfo, newDeviceInfo, deserializeDeviceInfo, Keystore, newKeystore, deserializeKeystore, serializeDeviceInfo, ctx, serializeKeystore, Bot } from 'tanebi';
 import { resolve } from 'node:path';
 import { QrCodeProvider } from './qrcode';
+import { Channel, Guild, GuildMember, List, User } from '@satorijs/protocol';
+import { toKoishiChannel, toKoishiGuild, toKoishiGuildMember, toKoishiUser } from './transform/entity';
 
 declare module 'koishi' {
     interface Tables {
@@ -103,6 +105,63 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         } else {
             await this.internal.fastLogin();
         }
+    }
+
+    override async getGuildList(): Promise<List<Guild>> {
+        const groups = Array.from(await this.internal.getGroups());
+        return {
+            data: groups.map(toKoishiGuild),
+        };
+    }
+
+    override async getGuild(guildId: string): Promise<Guild> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        return toKoishiGuild(group);
+    }
+
+    override async getChannelList(guildId: string): Promise<List<Channel>> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        return {
+            data: [toKoishiChannel(group)],
+        };
+    }
+
+    override async getChannel(channelId: string, guildId?: string): Promise<Channel> {
+        const group = await this.internal.getGroup(parseInt(guildId ?? channelId));
+        return toKoishiChannel(group);
+    }
+
+    override async getFriendList(): Promise<List<User>> {
+        const friends = Array.from(await this.internal.getFriends());
+        return {
+            data: friends.map(toKoishiUser),
+        };
+    }
+
+    override async getGuildMemberList(guildId: string): Promise<List<GuildMember>> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        const members = Array.from(await group.getMembers());
+        return {
+            data: members.map(toKoishiGuildMember),
+        };
+    }
+
+    override async getGuildMember(guildId: string, userId: string): Promise<GuildMember> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        const member = await group.getMember(parseInt(userId));
+        return toKoishiGuildMember(member);
+    }
+
+    override async kickGuildMember(guildId: string, userId: string, permanent?: boolean): Promise<void> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        const member = await group.getMember(parseInt(userId));
+        await member.kick(!permanent);
+    }
+
+    override async muteGuildMember(guildId: string, userId: string, duration: number): Promise<void> {
+        const group = await this.internal.getGroup(parseInt(guildId));
+        const member = await group.getMember(parseInt(userId));
+        await member.mute(Math.round(duration / 1000));
     }
 
     override async dispose(): Promise<void> {
