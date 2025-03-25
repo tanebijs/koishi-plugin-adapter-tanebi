@@ -1,7 +1,6 @@
 ﻿<script lang="ts" setup>
-import {} from '../src/qrcode.ts';
+import '../src/qrcode.ts';
 import { store } from '@koishijs/client';
-import { computed } from 'vue';
 </script>
 
 <template>

@@ -27,6 +27,7 @@
   },
   "peerDependencies": {
     "@koishijs/plugin-console": "^5.30.7",
+    "@satorijs/protocol": "*",
     "koishi": "^4.18.7"
   },
   "dependencies": {
