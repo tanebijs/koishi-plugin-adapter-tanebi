@@ -1,5 +1,19 @@
 import { Schema, Bot as KoishiBot, Context } from 'koishi';
-import { fetchAppInfoFromSignUrl, UrlSignProvider, DeviceInfo, newDeviceInfo, deserializeDeviceInfo, Keystore, newKeystore, deserializeKeystore, serializeDeviceInfo, ctx, serializeKeystore, Bot } from 'tanebi';
+import {
+    fetchAppInfoFromSignUrl,
+    UrlSignProvider,
+    DeviceInfo,
+    newDeviceInfo,
+    deserializeDeviceInfo,
+    Keystore,
+    newKeystore,
+    deserializeKeystore,
+    serializeDeviceInfo,
+    ctx,
+    serializeKeystore,
+    Bot,
+    faceCache,
+} from 'tanebi';
 import { resolve } from 'node:path';
 import { QrCodeProvider } from './qrcode';
 import { Channel, Guild, GuildMember, List, User } from '@satorijs/protocol';
@@ -36,19 +50,27 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
 
         this.ctx.plugin(QrCodeProvider, () => this.qrCode);
 
-        this.ctx.model.extend('tanebi.deviceInfo', {
-            uin: 'integer',
-            payload: 'string',
-        }, {
-            primary: 'uin',
-        });
+        this.ctx.model.extend(
+            'tanebi.deviceInfo',
+            {
+                uin: 'integer',
+                payload: 'string',
+            },
+            {
+                primary: 'uin',
+            }
+        );
 
-        this.ctx.model.extend('tanebi.keystore', {
-            uin: 'integer',
-            payload: 'string',
-        }, {
-            primary: 'uin',
-        });
+        this.ctx.model.extend(
+            'tanebi.keystore',
+            {
+                uin: 'integer',
+                payload: 'string',
+            },
+            {
+                primary: 'uin',
+            }
+        );
     }
 
     override async start(): Promise<void> {
@@ -81,6 +103,14 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         this.internal.onInfo((module, message) => this.logger.info(`[${module}] ${message}`));
         this.internal.onWarning((module, message) => this.logger.warn(`[${module}] ${message}`));
 
+        if (this.config.logging.message) {
+            this.installMessageLogger();
+        }
+
+        if (this.config.logging.event) {
+            this.installEventLogger();
+        }
+
         if (firstUse) {
             try {
                 await this.internal.qrCodeLogin((url, png) => {
@@ -105,6 +135,184 @@ class TanebiBot extends KoishiBot<Context, TanebiBot.Config> {
         } else {
             await this.internal.fastLogin();
         }
+    }
+
+    private installMessageLogger() {
+        this.internal.onPrivateMessage((friend, message) =>
+            this.logger.info(
+                message.isSelf ? '->' : '<-',
+                `[${friend.remark || friend.nickname} (${friend.uin})]`,
+                message.content.toPreviewString()
+            )
+        );
+
+        this.internal.onGroupMessage((group, sender, message) =>
+            this.logger.info(
+                sender.uin === this.internal.uin ? '->' : '<-',
+                `[${group.name} (${group.uin})]`,
+                `[${sender.card || sender.nickname} (${sender.uin})]`,
+                message.content.toPreviewString()
+            )
+        );
+    }
+
+    private installEventLogger() {
+        this.internal.onFriendPoke((friend, isSelf, actionStr, _, suffix) =>
+            this.logger.info(
+                '[friend-poke]',
+                isSelf
+                    ? `你${actionStr || '戳了戳'}${friend.remark || friend.nickname} (${friend.uin}) ${suffix}`
+                    : `${friend.remark || friend.nickname} (${friend.uin}) ${actionStr || '戳了戳'}你${suffix}`
+            )
+        );
+
+        this.internal.onFriendRecall((friend, _, tip) => {
+            this.logger.info('[friend-recall]', `[${friend.remark || friend.nickname} (${friend.uin})]`, tip);
+        });
+
+        this.internal.onFriendRequest((req) => {
+            this.logger.info('[friend-request]', `(${req.fromUin})`, 'with message', req.message, 'via', req.via);
+        });
+
+        this.internal.onGroupAdminChange((group, member, isPromote) => {
+            this.logger.info(
+                '[group-admin-change]',
+                `[${group.name} (${group.uin})]`,
+                `${member.card || member.nickname} (${member.uin})`,
+                isPromote ? 'promoted' : 'demoted'
+            );
+        });
+
+        this.internal.onGroupEssenceMessageChange((group, sequence, operator, isAdd) => {
+            this.logger.info(
+                '[group-essence-message-change]',
+                `[${group.name} (${group.uin})]`,
+                `[sequence=${sequence}]`,
+                isAdd ? 'added to essence by' : 'removed from essence by',
+                `${operator.card || operator.nickname} (${operator.uin})`,
+            );
+        });
+
+        this.internal.onGroupInvitationRequest((req) => {
+            this.logger.info(
+                '[group-invitation-request]',
+                `[${req.invitor.remark || req.invitor.nickname} (${req.invitor.uin})]`,
+                'invited you to join group',
+                req.groupUin,
+            );
+        });
+
+        this.internal.onGroupInvitedJoinRequest((group, req) => {
+            this.logger.info(
+                '[group-invited-join-request]',
+                `[${group.name} (${group.uin})]`,
+                `${req.invitor.card || req.invitor.nickname} (${req.invitor.uin})`,
+                'invited',
+                `(${req.targetUin})`,
+                'to join',
+            );
+        });
+
+        this.internal.onGroupJoinRequest((group, req) => {
+            this.logger.info(
+                '[group-join-request]',
+                `[${group.name} (${group.uin})]`,
+                `(${req.requestUin})`,
+                'applied to join with comment',
+                req.comment,
+            );
+        });
+
+        this.internal.onGroupMemberIncrease((group, member, operator) => {
+            this.logger.info(
+                '[group-member-increase]',
+                `[${group.name} (${group.uin})]`,
+                `${member.card || member.nickname} (${member.uin})`,
+                'joined',
+                `[handled by ${operator.card || operator.nickname} (${operator.uin})]`
+            );
+        });
+
+        this.internal.onGroupMemberLeave((group, memberUin) => {
+            this.logger.info(
+                '[group-member-decrease]',
+                `[${group.name} (${group.uin})]`,
+                `(${memberUin})`,
+                'left',
+            );
+        });
+
+        this.internal.onGroupMemberKick((group, memberUin, operator) => {
+            this.logger.info(
+                '[group-member-kick]',
+                `[${group.name} (${group.uin})]`,
+                `(${memberUin})`,
+                'was kicked by',
+                `${operator.card || operator.nickname} (${operator.uin})`
+            );
+        });
+
+        this.internal.onGroupMute((group, member, operator, duration) => {
+            this.logger.info(
+                '[group-mute]',
+                `[${group.name} (${group.uin})]`,
+                `${member.card || member.nickname} (${member.uin})`,
+                'was muted by',
+                `${operator.card || operator.nickname} (${operator.uin})`,
+                'for',
+                duration,
+                'seconds'
+            );
+        });
+
+        this.internal.onGroupUnmute((group, member, operator) => {
+            this.logger.info(
+                '[group-unmute]',
+                `[${group.name} (${group.uin})]`,
+                `${member.card || member.nickname} (${member.uin})`,
+                'was unmuted by',
+                `${operator.card || operator.nickname} (${operator.uin})`
+            );
+        });
+
+        this.internal.onGroupMuteAll((group, operator, isSet) => {
+            this.logger.info(
+                '[group-mute-all]',
+                `[${group.name} (${group.uin})]`,
+                isSet ? 'was muted by' : 'was unmuted by',
+                `${operator.card || operator.nickname} (${operator.uin})`
+            );
+        });
+
+        this.internal.onGroupReaction((group, _, operator, code, isAdd) => {
+            this.logger.info(
+                '[group-reaction]',
+                `[${group.name} (${group.uin})]`,
+                `${operator.card || operator.nickname} (${operator.uin})`,
+                isAdd ? 'added reaction' : 'removed reaction',
+                this.internal[faceCache].get(code)?.qDes ?? '',
+                `(${code})`
+            );
+        });
+
+        this.internal.onGroupRecall((group, _, tip, operator) => {
+            this.logger.info(
+                '[group-recall]',
+                `[${group.name} (${group.uin})]`,
+                `${operator.card || operator.nickname} (${operator.uin})`,
+                tip,
+            );
+        });
+
+        this.internal.onGroupPoke((group, sender, receiver, actionStr, _, suffix) =>
+            this.logger.info(
+                '[group-poke]',
+                `[${group.name} (${group.uin})]`,
+                `${sender.card || sender.nickname} (${sender.uin}) ${actionStr || '戳了戳'}${
+                    receiver.card || receiver.nickname
+                } (${receiver.uin}) ${suffix}`
+            )
+        );
     }
 
     override async getGuildList(): Promise<List<Guild>> {
@@ -175,15 +383,19 @@ namespace TanebiBot {
     export interface Config {
         uin: number;
         signApiUrl: string;
+        logging: {
+            message: boolean;
+            event: boolean;
+        };
     }
 
     export const Config: Schema<Config> = Schema.object({
-        uin: Schema.number()
-            .description('机器人 QQ 号')
-            .default(0),
-        signApiUrl: Schema.string()
-            .description('签名 API URL')
-            .default('https://sign.lagrangecore.org/api/sign/30366'),
+        uin: Schema.number().description('机器人 QQ 号').default(0),
+        signApiUrl: Schema.string().description('签名 API URL').default('https://sign.lagrangecore.org/api/sign/30366'),
+        logging: Schema.object({
+            message: Schema.boolean().description('记录消息日志').default(true),
+            event: Schema.boolean().description('记录事件日志').default(true),
+        }),
     });
 }
 
