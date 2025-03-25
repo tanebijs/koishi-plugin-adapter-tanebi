@@ -30,6 +30,6 @@
     "koishi": "^4.18.7"
   },
   "dependencies": {
-    "tanebi": "^0.1.3"
+    "tanebi": "^0.1.5"
   }
 }
